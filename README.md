@@ -32,7 +32,7 @@ Since DLLs will share the same function addresses among processes, it is possibl
 <div align="center">
     <img src="/img/notepad_user32.png">  
 
-In the [example photo](/RemoteFunctionStomper/img/demo.png), the program found [MessageBoxW](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-messageboxw) at the memory address 0x7FFCFD9DB290 which falls within the available memory ranges of the User32.dll in the notepad.exe process. Specifically, the function is located in the memory image with a base address of 0x7FFCFD961000 at an offset of 0x7A290 bytes.  
+In the [example photo](/img/demo.png), the program found [MessageBoxW](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-messageboxw) at the memory address 0x7FFCFD9DB290 which falls within the available memory ranges of the User32.dll in the notepad.exe process. Specifically, the function is located in the memory image with a base address of 0x7FFCFD961000 at an offset of 0x7A290 bytes.  
 </div>
   
   
