@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <stdio.h>
 #include <tlhelp32.h>
+#include <psapi.h>
 
 #define GREEN   "\033[1;32m"
 #define YELLOW  "\033[1;33m"
@@ -17,14 +18,94 @@ CONST CHAR Banner[] = " _____             _   _            _____ _\n"
 "|   __|_ _ ___ ___| |_|_|___ ___   |   __| |_ ___ _____ ___ ___ ___\n"
 "|   __| | |   |  _|  _| | . |   |  |__   |  _| . |     | . | -_|  _|\n"
 "|__|  |___|_|_|___|_| |_|___|_|_|  |_____|_| |___|_|_|_|  _|___|_|\n"
-"By " PURPLE "wizardy0ga" END "                                          |_|   v1.0.0\n"
+"By " PURPLE "wizardy0ga" END "                                          |_|   v1.1.0\n"
 "Github: " GREEN "https://github.com/wizardy0ga/RemoteFunctionStomper" END "\n"
 "====================================================================\n";
 
-// description:            Gets the pid of a remote process by name
+// description:                 Convert an ansi string to a lower case string
 //
-// param -> lpProcessName: The name of the process to search for
-// param -> dwProcessId:   A pointer to a DWORD variable to write the pid to
+// param -> lpcString:          Pointer to a const char array that will be converted to a lower case string
+// param -> lpStringLower:      Pointer to a char array that will contain the lower case string
+// param -> szStringLowerSize:  Size of the lpStringLower parameter 
+VOID ConvertStringToLowerA(IN LPCSTR lpcString, OUT LPSTR lpStringLower, IN DWORD dwStringLowerSize) {
+    
+    // Set buffer to 0's
+    RtlSecureZeroMemory(lpStringLower, dwStringLowerSize);
+    
+    // Convert each character to a lower case character and store in buffer
+    SIZE_T  szStringSize    = strlen(lpcString);
+    int     i               = 0;
+    for (; i < szStringSize; i++) {
+        lpStringLower[i] = (CHAR)tolower(lpcString[i]);
+    }
+    lpStringLower[i++] = '\0';
+}
+
+// description:                  Convert a wide string to a lower case ansi string
+//
+// param -> lpcwString:          Pointer to a const wide char array that will be converted to a lower case string
+// param -> lpStringLower:       Pointer to a char array that will contain the lower case string
+// param -> szStringLowerSize:   Size of the lpStringLower parameter 
+VOID ConvertStringToLowerW(IN LPCWSTR lpcwString, OUT LPSTR lpStringLower, IN DWORD dwStringLowerSize) {
+    
+    // Set buffer to 0's
+    RtlSecureZeroMemory(lpStringLower, dwStringLowerSize);
+    
+    // Convert each character to a lower case character and store in buffer
+    SIZE_T  szStringSize    = lstrlenW(lpcwString);
+    int     i               = 0;
+    for (; i < szStringSize; i++) {
+        lpStringLower[i] = (CHAR)tolower(lpcwString[i]);
+    }
+    lpStringLower[i++] = '\0';
+}
+
+// description:                 Search a process for a loaded module
+// 
+// param -> hProcess:           Handle to the process to search
+// param -> lpcDllNameInput:    The name of the DLL to search for
+BOOL CheckProcessForModule(IN HANDLE hProcess, IN LPCSTR lpcDllNameInput) {
+    
+    HMODULE hModuleArray[1024];
+    DWORD   lpcbNeeded  = 0;
+
+    RtlSecureZeroMemory(hModuleArray, 1024);
+
+    // Populate module array with handles to modules in process
+    if (EnumProcessModules(hProcess, hModuleArray, 1024, &lpcbNeeded) == 0) {
+        apierror("EnumProcessModules");
+        return FALSE;
+    }
+
+    // Iterate over the module handles in the array
+    for (int i = 0; i < (lpcbNeeded / sizeof(HMODULE)); i++) {
+
+        // Get the name of the dll
+        CHAR lpBaseName[MAX_PATH];
+        RtlSecureZeroMemory(lpBaseName, MAX_PATH);
+        if (GetModuleBaseNameA(hProcess, hModuleArray[i], (LPSTR)lpBaseName, MAX_PATH)) {
+            
+            // Convert dll names to lower case
+            CHAR lpBaseNameLower[MAX_PATH];
+            CHAR lpDllNameInputLower[MAX_PATH];
+            ConvertStringToLowerA(lpBaseName, lpBaseNameLower, MAX_PATH);
+            ConvertStringToLowerA(lpcDllNameInput, lpDllNameInputLower, MAX_PATH);
+
+            // Check if DLL name in process matches DLL name in function
+            if (strcmp(lpBaseNameLower, lpDllNameInputLower) == 0) {
+                return TRUE;
+            }
+        }
+    }
+
+    // Return false if no matching dll name was found
+    return FALSE;
+}
+
+// description:             Gets the pid of a remote process by name
+//
+// param -> lpProcessName:  The name of the process to search for
+// param -> dwProcessId:    A pointer to a DWORD variable to write the pid to
 BOOL GetProcessPid(IN LPCSTR lpProcessName, OUT DWORD* dwProcessId) {
 
     HANDLE          hSnapshot   = NULL;
@@ -48,35 +129,29 @@ BOOL GetProcessPid(IN LPCSTR lpProcessName, OUT DWORD* dwProcessId) {
     do {
         if (Process.th32ProcessID && Process.szExeFile) {
 
-            // Set process name in structure to lowercase
+            // Set process names to lower case
             CHAR    ProcNameLower[MAX_PATH];
-            SIZE_T  StructProcessNameSize = lstrlenW(Process.szExeFile);
-            int i = 0;
-            RtlSecureZeroMemory(ProcNameLower, MAX_PATH);
-            for (; i < StructProcessNameSize; i++) {
-                ProcNameLower[i] = (CHAR)tolower(Process.szExeFile[i]);
-            }
-            ProcNameLower[i++] = '\0';
+            CHAR    ProcNameInputLower[MAX_PATH];
+            ConvertStringToLowerW(Process.szExeFile, ProcNameLower, MAX_PATH);
+            ConvertStringToLowerA(lpProcessName, ProcNameInputLower, MAX_PATH);
 
             // Check if process name matches process name given in parameter & save pid
-            if (strcmp(ProcNameLower, lpProcessName) == 0) {
+            if (strcmp(ProcNameLower, ProcNameInputLower) == 0) {
                 *dwProcessId = Process.th32ProcessID;
                 break;
             }
-
         }
 
     // Populate structure with next process in the snapshot
     } while (Process32Next(hSnapshot, &Process));
 
+    // Cleanup
     if (hSnapshot) {
         CloseHandle(hSnapshot);
     }
-
     if (*dwProcessId == 0) {
         return FALSE;
     }
-
     return TRUE;
 
 }
@@ -230,10 +305,21 @@ int main(int argc, char* argv[]) {
 
     // Open a handle to the process
     if (!(hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, dwProcessId))) {
-        apierror("OpenProcess");
+        if (GetLastError() == ERROR_ACCESS_DENIED) {
+            error("Insufficient privileges to access %s at pid %d", TargetProc, dwProcessId);
+        }
+        else {
+            apierror("OpenProcess");
+        }
         goto Cleanup;
     }
     print("Got handle to %s", TargetProc);
+
+    // Ensure target DLL is present in the process
+    if (!(CheckProcessForModule(hProcess, TargetDll))) {
+        error("%s is not loaded in %s", TargetDll, TargetProc);
+        goto Cleanup;
+    }
 
     // Load the target library into this process
     if (!(hModule = LoadLibraryA(TargetDll))) {

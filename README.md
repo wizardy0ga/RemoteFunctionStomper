@@ -3,7 +3,7 @@
 |   __|_ _ ___ ___| |_|_|___ ___   |   __| |_ ___ _____ ___ ___ ___
 |   __| | |   |  _|  _| | . |   |  |__   |  _| . |     | . | -_|  _|
 |__|  |___|_|_|___|_| |_|___|_|_|  |_____|_| |___|_|_|_|  _|___|_|
-By wizardy0ga                                          |_|   v1.0.0
+By wizardy0ga                                          |_|   v1.1.0
 Github: https://github.com/wizardy0ga/RemoteFunctionStomper
 ```
 
@@ -70,3 +70,11 @@ FunctionStomper.exe <path to payload.bin> <target process name> <dll name> <func
 [From Process Injection to Function Hijacking](https://klezvirus.github.io/RedTeaming/AV_Evasion/FromInjectionToHijacking/#:~:text=Function%20stomping%20is%20a%20technique,overwrites%20a%20specific%20exported%20function.)
 
 [Function Stomping](https://github.com/Idov31/FunctionStomping)
+
+### Change Log
+
+#### Version 1.1.0
+
+- Added check operation to ensure specified DLL exists in the target process before injecting payload.
+- Added ability to use any letter casing in the target process argument.
+- Added error checking for insufficient privileges when accessing a process running at a higher privilege / integrity level.
